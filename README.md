@@ -92,7 +92,75 @@ infra-pilot-iac/
 
 ---
 
-## 3. Usage & Operations Workflow
+## 3. Quick-Start Deployment Guide (What you must do manually first)
+
+Terraform requires a remote backend (S3 bucket) to be active **before** the CI/CD pipeline runs for the first time. This is a classic "chicken-and-egg" scenario. Follow this manual onboarding sequence to bootstrap your repository:
+
+### Step 1: Create the S3 State Bucket Manually
+Run this AWS CLI command in your local terminal to create the S3 bucket that will host the Terraform state file. Since S3 bucket names must be globally unique, replace `infrapilot-terraform-state-sumit` with your preferred unique name:
+```bash
+aws s3api create-bucket --bucket "infrapilot-terraform-state-sumit" --region us-east-1
+```
+*(If you change this name, update the `bucket` field inside `terraform/main.tf` to match).*
+
+### Step 2: Configure GitHub Credentials
+Go to your repository settings on GitHub and add your AWS user credentials:
+1. Navigate to **Settings** -> **Secrets and variables** -> **Actions**.
+2. Click **New repository secret** and add:
+   * **`AWS_ACCESS_KEY_ID`**: Your AWS user Access Key ID.
+   * **`AWS_SECRET_ACCESS_KEY`**: Your AWS user Secret Access Key.
+3. Switch to the **Variables** tab, click **New repository variable** and add:
+   * **`AWS_REGION`**: `us-east-1` (or whichever region you deploy to).
+
+### Step 3: Trigger the Staging Pipeline
+To provision the staging environment:
+1. Click the **Actions** tab on your GitHub repository.
+2. Select the **Terraform CI/CD** workflow.
+3. Click the **Run workflow** dropdown on the right.
+4. Select the **`stage`** branch.
+5. Set environment to **`stage`**, action to **`apply`**, and run.
+
+---
+
+## 4. Industry Best Practices (Local vs. CI/CD)
+
+How do engineering and SRE teams manage Terraform configurations in a professional production environment?
+
+```
+ SRE Laptop                                    GitHub Actions Runner
+┌──────────────────────────────┐              ┌──────────────────────────────┐
+│  - Runs local syntax checks  │              │  - Runs on isolated VMs      │
+│  - Runs dry-run plans        │ ───────────► │  - Enforces review gates     │
+│  - BLOCKED from local apply  │  (git push)  │  - Runs apply automatically  │
+└──────────────────────────────┘              └──────────────────────────────┘
+```
+
+### Rule 1: Never run `terraform apply` locally for Staging or Production
+In enterprise companies, developers and SREs do **not** run `terraform apply` from their local laptops. 
+* **Why**: Running it locally can lead to configuration drift, lock conflicts, and security violations (developers having admin access on their local machines).
+* **GitOps Standard**: All applies must happen inside the isolated CI/CD runner after a code review (pull request approval) is completed.
+
+### Rule 2: Use local terminals only for syntax validation and dry-runs
+You should use your local terminal to verify that your Terraform syntax is correct and that it matches AWS API requirements before committing:
+
+```bash
+# 1. Navigate to the terraform directory
+cd terraform
+
+# 2. Initialize and link to the S3 state (requires passing the environment key)
+terraform init -backend-config="key=environments/stage/terraform.tfstate"
+
+# 3. Format and validate HCL files
+terraform fmt
+terraform validate
+
+# 4. Run a local dry-run plan to see changes
+terraform plan -var="environment=stage"
+```
+
+---
+
+## 5. Operations & Upgrade Workflows
 
 Use this flowchart to guide your day-to-day operations and modifications:
 
@@ -115,26 +183,9 @@ flowchart TD
     ApplyProd --> Done([Infrastructure Upgraded!])
 ```
 
-### Setup GitHub Actions (First-time Config)
-Add the following **Repository Secrets** under **Settings** -> **Secrets and variables** -> **Actions**:
-* `AWS_ACCESS_KEY_ID`: Your AWS Access Key ID.
-* `AWS_SECRET_ACCESS_KEY`: Your AWS Secret Access Key.
-
-Add the following **Repository Variable**:
-* `AWS_REGION`: The target AWS region (e.g., `us-east-1`).
-
-### Manual Pipeline Trigger (`workflow_dispatch`)
-You can dry-run plans, apply changes, or destroy resources manually:
-1. Go to your repository on GitHub and click the **Actions** tab.
-2. Select the **Terraform CI/CD** workflow.
-3. Click the **Run workflow** dropdown on the right.
-4. Select the options:
-   * **Target environment**: `stage` (default) or `prod`.
-   * **Terraform action**: `plan` (default), `apply`, or `destroy`.
-
 ---
 
-## 4. Troubleshooting & Debugging Flow
+## 6. Troubleshooting & Debugging Flow
 
 Use the checklist flowchart below if your ECS tasks fail to start or the load balancer reports health check errors:
 
@@ -208,7 +259,7 @@ aws logs get-log-events \
 
 ---
 
-## 5. Current System Problems & Future Cloud-Native Upgrades
+## 7. Current System Problems & Future Cloud-Native Upgrades
 
 While the current architecture (ECS Fargate + Local sidecars) is cost-efficient and excellent for education, it has trade-offs that make it unsuitable for high-load production environments. Below is how other cloud-native technologies solve these limitations:
 
@@ -235,7 +286,7 @@ While the current architecture (ECS Fargate + Local sidecars) is cost-efficient 
 
 ---
 
-## 6. Multi-Cloud Migration Strategy
+## 8. Multi-Cloud Migration Strategy
 
 Terraform makes it simple to migrate your workload to other cloud providers. Below is how the AWS components map to Google Cloud (GCP) and Microsoft Azure:
 
