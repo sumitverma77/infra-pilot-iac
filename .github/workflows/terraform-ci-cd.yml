@@ -14,19 +14,19 @@ on:
       environment:
         description: 'Target environment to manage'
         required: true
-        default: 'prod'
+        default: 'stage'
         type: choice
         options:
-          - prod
           - stage
+          - prod
       action:
         description: 'Terraform action'
         required: true
-        default: 'apply'
+        default: 'plan'
         type: choice
         options:
-          - apply
           - plan
+          - apply
           - destroy
 
 permissions:
