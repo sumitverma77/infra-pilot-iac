@@ -5,10 +5,14 @@ on:
     branches:
       - main
       - stage
+    paths:
+      - 'terraform/**'
   pull_request:
     branches:
       - main
       - stage
+    paths:
+      - 'terraform/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -47,7 +51,7 @@ jobs:
             echo "env_name=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
             echo "action=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
           else
-            if [ "${{ github.ref_name }}" = "main" ]; then
+            if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.base_ref }}" = "main" ]; then
               echo "env_name=prod" >> $GITHUB_OUTPUT
             else
               echo "env_name=stage" >> $GITHUB_OUTPUT
@@ -64,6 +68,10 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     environment: ${{ needs.setup.outputs.env_name }}
+    
+    defaults:
+      run:
+        working-directory: terraform
     
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

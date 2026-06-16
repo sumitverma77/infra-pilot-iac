@@ -68,28 +68,52 @@ graph TD
 
 ---
 
-## 2. Infrastructure Components Matrix
+## 2. Directory Layout & Organization
 
-Here is what this Terraform code provisions and manages in your AWS account:
+The repository has been structured cleanly to separate pipeline configuration from infrastructure blueprints. Changes to documentation files (like `README.md`) will **not** trigger any CI/CD runs. Only changes made within the `terraform/` directory will initiate the pipelines.
 
-| Component | Resource Type | Description / Configuration |
-| :--- | :--- | :--- |
-| **VPC** | `aws_vpc` | Isolated virtual network block (`10.50.0.0/16`) for network boundaries. |
-| **Public Subnets** | `aws_subnet` | Dual subnets spanning two Availability Zones (`us-east-1a`, `us-east-1b`) for high-availability routing. |
-| **IGW & Routes** | `aws_internet_gateway` | Enables incoming load balancer traffic and outgoing container pulls. |
-| **Security Groups** | `aws_security_group` | Stateful firewalls. ALB allows port 80/443; ECS task only allows port 8080 from the ALB. |
-| **Load Balancer** | `aws_lb` | Application Load Balancer (ALB) acting as the public entry point for client HTTP requests. |
-| **Target Group** | `aws_lb_target_group` | Routes traffic to container port 8080 with Actuator readiness health checks. |
-| **ECS Cluster** | `aws_ecs_cluster` | Logical grouping for Fargate task container orchestration. |
-| **ECR Registry** | `aws_ecr_repository` | Private Docker registries isolated per environment (`infrapilot-stage` and `infrapilot-prod`). |
-| **Task Definition** | `aws_ecs_task_definition` | The blueprint defining the 3-container pod (API, Postgres 16, and Redis 7.4). |
-| **ECS Service** | `aws_ecs_service` | Orchestrates running instances. Ignores task definition changes to support app-only deployments. |
+```
+infra-pilot-iac/
+├── .github/
+│   └── workflows/
+│       └── terraform-ci-cd.yml   # CI/CD pipeline definition
+├── terraform/                    # All Terraform HCL code resides here
+│   ├── main.tf                   # Provider setup & S3 backend
+│   ├── variables.tf              # Input parameters (port, sizes, etc.)
+│   ├── vpc.tf                    # Networking layer (VPC, Subnets, Gateway)
+│   ├── ecr.tf                    # Isolated container registry definitions
+│   ├── ecs.tf                    # Task definitions & Fargate cluster config
+│   ├── alb.tf                    # Load Balancers & Target Group routing
+│   ├── security-groups.tf        # Network firewalls
+│   └── outputs.tf                # Outputs (VPC ID, ALB DNS, Cluster name)
+├── .gitignore                    # Excludes local terraform files & state caches
+└── README.md                     # Operator guide & playbooks
+```
 
 ---
 
-## 3. How to Use & Operate the IaC Repository
+## 3. Usage & Operations Workflow
 
-The pipeline is fully automated but supports manual operations for safety and environment control.
+Use this flowchart to guide your day-to-day operations and modifications:
+
+```mermaid
+flowchart TD
+    Start([Need to change Infra?]) --> Branch[Create Feature Branch]
+    Branch --> Edit[Edit HCL Files in terraform/ folder]
+    Edit --> Format[Run 'terraform fmt' locally]
+    Format --> Push[Push Branch to GitHub]
+    Push --> PR[Open PR to stage branch]
+    PR --> Plan[Pipeline runs dry-run 'plan']
+    Plan --> Verify{Is Plan correct?}
+    Verify -->|No| Edit
+    Verify -->|Yes| Merge[Merge PR to stage branch]
+    Merge --> ApplyStg[Pipeline applies changes to Staging VPC]
+    ApplyStg --> ValidateStg{Is Staging stable?}
+    ValidateStg -->|No| Fix[Fix code on feature branch]
+    ValidateStg -->|Yes| MergeProd[Merge stage branch to main branch]
+    MergeProd --> ApplyProd[Pipeline applies changes to Production VPC]
+    ApplyProd --> Done([Infrastructure Upgraded!])
+```
 
 ### Setup GitHub Actions (First-time Config)
 Add the following **Repository Secrets** under **Settings** -> **Secrets and variables** -> **Actions**:
@@ -99,43 +123,43 @@ Add the following **Repository Secrets** under **Settings** -> **Secrets and var
 Add the following **Repository Variable**:
 * `AWS_REGION`: The target AWS region (e.g., `us-east-1`).
 
----
-
 ### Manual Pipeline Trigger (`workflow_dispatch`)
 You can dry-run plans, apply changes, or destroy resources manually:
 1. Go to your repository on GitHub and click the **Actions** tab.
 2. Select the **Terraform CI/CD** workflow.
 3. Click the **Run workflow** dropdown on the right.
 4. Select the options:
-   * **Target environment**: `stage` or `prod`.
-   * **Terraform action**: `plan` (dry-run review), `apply` (deploy updates), or `destroy` (tear down).
+   * **Target environment**: `stage` (default) or `prod`.
+   * **Terraform action**: `plan` (default), `apply`, or `destroy`.
 
 ---
 
-### How to Modify and Update Infrastructure
-Follow these steps to update infrastructure variables or resource sizes:
-1. **Create a local branch**:
-   ```bash
-   git checkout -b feature/increase-ecs-size
-   ```
-2. **Modify the code**: Edit [variables.tf](file:///c:/Users/ASUS/Desktop/Sumit/vscode/infra-pilot-iac/variables.tf) (e.g., increase `task_cpu` to `2048` or `task_memory` to `4096`).
-3. **Commit & Push**:
-   ```bash
-   git add variables.tf
-   git commit -m "feat: scale up ECS task size configuration"
-   git push -u origin feature/increase-ecs-size
-   ```
-4. **Open a PR**: Open a PR on GitHub targeting the **`stage`** branch. The PR validation pipeline will automatically run a dry-run check (`terraform plan`) so you can verify the changes.
-5. **Merge PR**: Once merged, the pipeline runs `terraform apply -auto-approve` to update the Staging environment automatically.
-6. **Deploy to Production**: To deploy to Production, merge the `stage` branch into the **`main`** branch.
+## 4. Troubleshooting & Debugging Flow
 
----
+Use the checklist flowchart below if your ECS tasks fail to start or the load balancer reports health check errors:
 
-## 4. SRE Debugging Playbook
+```mermaid
+flowchart TD
+    Error([Task Crash or ALB Unhealthy]) --> Step1[Check ECS Service events & stopped tasks]
+    Step1 --> CheckStopped{Is Task Stopped?}
+    
+    CheckStopped -->|Yes| Step2[Run describe-tasks StoppedReason CLI]
+    Step2 --> Diagnose{StoppedReason diagnostic?}
+    Diagnose -->|Out Of Memory| Scale[Increase task_cpu/memory in variables.tf]
+    Diagnose -->|Container error/Exit 1| Step3[Query task CloudWatch log streams]
+    
+    CheckStopped -->|No| Step4[Query target group health check status]
+    Step4 --> CheckHealthy{Marked Unhealthy?}
+    CheckHealthy -->|Yes| Step5[Spring boot slow to start? Check boot times in CW logs]
+    Step5 --> IncreaseGrace[Increase health_check_grace_period_seconds in ecs.tf]
+    
+    Step3 --> ReadLogs[Inspect Spring boot database/cache connectivity exceptions]
+    ReadLogs --> FixEnv[Verify loopback networking using localhost:5432 and localhost:6379]
+```
 
-Here are the essential AWS CLI commands for debugging and troubleshooting the live infrastructure.
+### SRE CLI Reference Cheat-Sheet
 
-### Scenario A: ECS Tasks Keep Crashing (Exit Code 1 / CrashLoop)
+#### Scenario A: ECS Tasks Keep Crashing (Exit Code 1 / CrashLoop)
 If your tasks are entering a boot-loop, list the stopped tasks to find the reason:
 ```bash
 # 1. List recently stopped tasks in the cluster
@@ -148,11 +172,8 @@ aws ecs describe-tasks \
   --query "tasks[0].stoppedReason" \
   --region us-east-1
 ```
-* **Common Cause**: Check CloudWatch Logs. If Spring Boot fails to start, it is usually because it cannot reach PostgreSQL or Redis on `localhost` (e.g. database credentials or sidecar startup failure).
 
----
-
-### Scenario B: Inspecting Container Logs on CloudWatch
+#### Scenario B: Inspecting Container Logs on CloudWatch
 To view the output console of your containers directly from the CLI:
 ```bash
 # 1. Fetch the last 50 logs from the application container
@@ -170,10 +191,7 @@ aws logs get-log-events \
   --region us-east-1
 ```
 
----
-
-### Scenario C: ALB Health Check Failures
-If the ALB target group marks the container as unhealthy:
+#### Scenario C: ALB Health Check Failures (Unhealthy State)
 1. **Spring Boot slow startup**: Check if Spring Boot takes longer than 120 seconds to boot up. If yes, increase `health_check_grace_period_seconds` in `ecs.tf`.
 2. **Readiness endpoint failure**: Query the health check path manually from a container shell or verify logs:
    ```bash
