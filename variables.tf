@@ -1,3 +1,4 @@
+# Variables configuration for InfraPilot deployment environments
 variable "aws_region" {
   description = "AWS region for InfraPilot"
   type        = string
