@@ -1,13 +1,11 @@
 terraform {
   required_version = ">= 1.6.0"
 
-  # Uncomment and configure this block to use an S3 bucket for remote state storage in CI/CD
-  # backend "s3" {
-  #   bucket         = "YOUR-AWS-S3-STATE-BUCKET-NAME"
-  #   key            = "infrapilot/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   dynamodb_table = "YOUR-DYNAMODB-LOCK-TABLE-NAME"
-  # }
+  backend "s3" {
+    bucket = "infrapilot-terraform-state-sumit"
+    region = "us-east-1"
+    # The key (state file path) will be overridden dynamically in the CI/CD pipeline
+  }
 
   required_providers {
     aws = {

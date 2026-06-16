@@ -83,7 +83,7 @@ jobs:
         run: terraform fmt -check
 
       - name: Initialize Terraform
-        run: terraform init
+        run: terraform init -backend-config="key=environments/${{ needs.setup.outputs.env_name }}/terraform.tfstate"
 
       - name: Validate Terraform
         run: terraform validate
