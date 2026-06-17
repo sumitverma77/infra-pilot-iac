@@ -15,12 +15,22 @@ variable "environment" {
   description = "Deployment environment"
   type        = string
   default     = "prod"
+
+  validation {
+    condition     = contains(["prod", "stage"], var.environment)
+    error_message = "The environment variable must be either 'prod' or 'stage'."
+  }
 }
 
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
   default     = "10.50.0.0/16"
+
+  validation {
+    condition     = can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$", var.vpc_cidr))
+    error_message = "The vpc_cidr variable must be a valid CIDR block notation (e.g. 10.0.0.0/16)."
+  }
 }
 
 variable "public_subnet_cidrs" {
@@ -51,6 +61,11 @@ variable "task_cpu" {
   description = "Fargate task CPU units"
   type        = number
   default     = 1024
+
+  validation {
+    condition     = contains([256, 512, 1024, 2048, 4096], var.task_cpu)
+    error_message = "The task_cpu value must be a valid Fargate CPU size (256, 512, 1024, 2048, or 4096)."
+  }
 }
 
 variable "task_memory" {
