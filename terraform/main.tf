@@ -2,8 +2,9 @@ terraform {
   required_version = ">= 1.6.0"
 
   backend "s3" {
-    bucket = "infrapilot-terraform-state-sumit"
-    region = "us-east-1"
+    bucket         = "infrapilot-terraform-state-sumit"
+    region         = "us-east-1"
+    dynamodb_table = "infrapilot-state-locks"
     # The key (state file path) will be overridden dynamically in the CI/CD pipeline
   }
 
