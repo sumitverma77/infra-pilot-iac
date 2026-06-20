@@ -140,6 +140,11 @@ resource "aws_ecs_service" "app" {
     container_port   = var.container_port
   }
 
+  # Prevent Terraform from reverting the active Spring Boot image back to the nginx placeholder
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
   depends_on = [
     aws_lb_listener_rule.routing
   ]
