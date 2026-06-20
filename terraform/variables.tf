@@ -1,4 +1,4 @@
-# Variables configuration for InfraPilot deployment environments
+# Input variables that let you change environment, sizing, and app settings without editing resources.
 variable "aws_region" {
   description = "AWS region for InfraPilot"
   type        = string
