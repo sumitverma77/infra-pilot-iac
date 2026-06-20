@@ -54,8 +54,4 @@ module "app_service" {
   alb_routing_priority = 100
   alb_path_patterns    = ["/*"]
 
-  # Application Secrets from AWS Secrets Manager
-  secrets_map = {
-    "SPRING_DATASOURCE_PASSWORD" = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.environment}/db-password"
-  }
 }
