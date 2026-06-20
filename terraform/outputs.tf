@@ -22,3 +22,18 @@ output "ecs_service_name" {
   description = "ECS Service Name"
   value       = module.app_service.service_name
 }
+
+output "infra_deploy_role_arn" {
+  description = "ARN of the Infrastructure Deployment Role"
+  value       = module.infra_deploy_role.role_arn
+}
+
+output "app_deploy_stage_role_arn" {
+  description = "ARN of the Application Stage Deployment Role"
+  value       = module.app_deploy_stage_role.role_arn
+}
+
+output "app_deploy_prod_role_arn" {
+  description = "ARN of the Application Prod Deployment Role"
+  value       = module.app_deploy_prod_role.role_arn
+}
