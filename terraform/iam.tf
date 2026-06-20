@@ -97,11 +97,11 @@ module "infra_deploy_role" {
   role_name         = "infra-deploy-role"
   oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
   github_org        = "sumitverma77"
-  match_subjects    = [
+  match_subjects = [
     "repo:sumitverma77/infra-pilot-iac:ref:refs/heads/main",
     "repo:sumitverma77/infra-pilot-iac:ref:refs/heads/stage"
   ]
-  managed_policies  = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+  managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
 }
 
 # 2. App Deploy Role - Stage (Allowed to deploy to stage environment)
@@ -110,13 +110,13 @@ module "app_deploy_stage_role" {
   role_name         = "app-deploy-stage-role"
   oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
   github_org        = "sumitverma77"
-  match_subjects    = [
+  match_subjects = [
     "repo:sumitverma77/infra-pilot-api:environment:stage",
     "repo:sumitverma77/user-service:environment:stage",
     "repo:sumitverma77/payment-service:environment:stage",
     "repo:sumitverma77/notification-service:environment:stage"
   ]
-  managed_policies  = [
+  managed_policies = [
     "arn:aws:iam::aws:policy/AmazonECS_FullAccess",
     "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
   ]
@@ -128,13 +128,13 @@ module "app_deploy_prod_role" {
   role_name         = "app-deploy-prod-role"
   oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
   github_org        = "sumitverma77"
-  match_subjects    = [
+  match_subjects = [
     "repo:sumitverma77/infra-pilot-api:environment:prod",
     "repo:sumitverma77/user-service:environment:prod",
     "repo:sumitverma77/payment-service:environment:prod",
     "repo:sumitverma77/notification-service:environment:prod"
   ]
-  managed_policies  = [
+  managed_policies = [
     "arn:aws:iam::aws:policy/AmazonECS_FullAccess",
     "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
   ]
