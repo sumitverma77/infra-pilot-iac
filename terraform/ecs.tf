@@ -43,7 +43,7 @@ module "app_service" {
   alb_listener_arn = var.acm_certificate_arn == null ? aws_lb_listener.http.arn : aws_lb_listener.https[0].arn
 
   container_port    = var.container_port
-  health_check_path = "/actuator/health/readiness"
+  health_check_path = "/actuator/health"
 
   # Sizing configured dynamically per environment
   cpu           = local.current_sizing.cpu

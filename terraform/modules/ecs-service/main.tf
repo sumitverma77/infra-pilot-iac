@@ -123,6 +123,7 @@ resource "aws_ecs_service" "app" {
   desired_count                      = var.desired_count
   launch_type                        = "FARGATE"
   platform_version                   = "LATEST"
+  health_check_grace_period_seconds  = 120
   deployment_minimum_healthy_percent = 100
   deployment_maximum_percent         = 200
   enable_execute_command             = true
@@ -137,6 +138,11 @@ resource "aws_ecs_service" "app" {
     target_group_arn = aws_lb_target_group.app.arn
     container_name   = var.service_name
     container_port   = var.container_port
+  }
+
+  # Prevent Terraform from reverting the active Spring Boot image back to the nginx placeholder
+  lifecycle {
+    ignore_changes = [task_definition]
   }
 
   depends_on = [
