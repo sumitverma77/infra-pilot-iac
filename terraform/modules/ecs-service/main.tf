@@ -25,11 +25,12 @@ resource "aws_security_group" "service" {
 
 # 2. Target Group for ALB routing
 resource "aws_lb_target_group" "app" {
-  name        = "${var.service_name}-${var.environment}-tg"
-  port        = var.container_port
-  protocol    = "HTTP"
-  vpc_id      = var.vpc_id
-  target_type = "ip"
+  name                 = "${var.service_name}-${var.environment}-tg"
+  port                 = var.container_port
+  protocol             = "HTTP"
+  vpc_id               = var.vpc_id
+  target_type          = "ip"
+  deregistration_delay = 30 # Speed up connection draining from 300s default
 
   health_check {
     enabled             = true
