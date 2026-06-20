@@ -1,3 +1,4 @@
+# Terraform version, remote state backend, and provider requirements.
 terraform {
   required_version = ">= 1.6.0"
 
@@ -16,6 +17,7 @@ terraform {
   }
 }
 
+# Shared AWS provider settings and default tags for all resources.
 provider "aws" {
   region = var.aws_region
 
@@ -27,12 +29,15 @@ provider "aws" {
   }
 }
 
+# Used when Terraform needs to know which AWS account is running the plan/apply.
 data "aws_caller_identity" "current" {}
 
+# Reads the list of currently available AWS availability zones in the selected region.
 data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# Common name prefix reused across resources so everything stays grouped by environment.
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
 }

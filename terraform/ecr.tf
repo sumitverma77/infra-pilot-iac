@@ -1,3 +1,4 @@
+# Private container registry where the application image is stored.
 resource "aws_ecr_repository" "this" {
   name                 = "${var.project_name}-${var.environment}"
   image_tag_mutability = "MUTABLE"
@@ -6,6 +7,7 @@ resource "aws_ecr_repository" "this" {
   }
 }
 
+# Automatically removes old images so the registry does not grow forever.
 resource "aws_ecr_lifecycle_policy" "this" {
   repository = aws_ecr_repository.this.name
 

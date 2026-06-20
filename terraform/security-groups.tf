@@ -1,3 +1,4 @@
+# Firewall rules for the public load balancer.
 resource "aws_security_group" "alb" {
   name        = "${local.name_prefix}-alb"
   description = "ALB security group"
@@ -28,6 +29,7 @@ resource "aws_security_group" "alb" {
   }
 }
 
+# Firewall rules for the ECS task. Only the ALB is allowed to talk to it.
 resource "aws_security_group" "ecs" {
   name        = "${local.name_prefix}-ecs"
   description = "ECS task security group"
