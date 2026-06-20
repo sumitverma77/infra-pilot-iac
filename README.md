@@ -6,7 +6,7 @@ Welcome to the central infrastructure repository for the **InfraPilot** platform
 
 ## 1. Architectural Map
 
-The diagram below details the end-to-end GitOps flow, showing how commits trigger infrastructure changes or application deployments, and how Fargate container tasks share a local network loopback interface to run database and caching sidecars for zero hosting costs.
+The diagram below details the end-to-end GitOps flow, showing how commits trigger infrastructure changes or application deployments. We have adopted an **industry-standard architecture** where Terraform provisions the base environment (Network, IAM, ALB, baseline ECS), and the Application CI/CD pipeline dynamically mutates the container sizing (CPU/Memory/Desired Tasks) directly from the application repo.
 
 ```mermaid
 graph TD
@@ -18,17 +18,20 @@ graph TD
 
     %% Pipelines
     subgraph IAC_Pipeline["Terraform CI/CD (GitHub Actions)"]
-        A1[git push / manual] --> A2[Terraform Init & Validate]
+        A1[git push / manual] --> OIDC1[OIDC Keyless Auth]
+        OIDC1 --> A2[Terraform Init & Validate]
         A2 -->|Loads state key dynamically| S3_State[(AWS S3 State Bucket)]
         A2 --> A3[Terraform Plan]
-        A3 -->|On main/stage branch| A4[Terraform Apply]
+        A3 -->|On main/stage branch| A4[Terraform Apply Baseline]
     end
 
     subgraph App_Pipeline["App CI/CD (GitHub Actions)"]
-        B1[git push / manual] --> B2[Maven Package jar]
+        B1[git push / manual] --> OIDC2[OIDC Keyless Auth]
+        OIDC2 --> B2[Maven Package jar]
         B2 --> B3[Docker Multi-stage Build]
         B3 -->|Push with tags| ECR_Repo["AWS ECR Registry"]
-        ECR_Repo --> B4[Register Task Definition & Update ECS]
+        ECR_Repo --> B4[Mutate ECS Task Definition (jq)]
+        B4 --> B5[Trigger ECS Rolling Deploy]
     end
 
     IAC_Repo -->|Trigger| IAC_Pipeline
@@ -44,8 +47,6 @@ graph TD
                 
                 subgraph ECS_Fargate["ECS Fargate Tasks (awsvpc network)"]
                     App_Container["Spring Boot Container (:8080)"]
-                    Postgres_Container["PostgreSQL Sidecar (:5432)"]
-                    Redis_Container["Redis Sidecar (:6379)"]
                 end
             end
         end
@@ -54,16 +55,12 @@ graph TD
     end
 
     %% Routing & Local networking
-    A4 -->|Provisions / Updates| AWS_Cloud
-    B4 -->|Triggers rolling deploy| ECS_Fargate
+    A4 -->|Provisions Base| AWS_Cloud
+    B5 -->|Overrides CPU/Memory & Updates Image| ECS_Fargate
     
     ALB -->|Target Group Routing :8080| App_Container
-    App_Container -->|localhost:5432| Postgres_Container
-    App_Container -->|localhost:6379| Redis_Container
     
     App_Container -.->|Writes Logs| CloudWatch
-    Postgres_Container -.->|Writes Logs| CloudWatch
-    Redis_Container -.->|Writes Logs| CloudWatch
 ```
 
 ---
@@ -76,8 +73,11 @@ The repository has been structured cleanly to separate pipeline configuration fr
 infra-pilot-iac/
 ├── .github/
 │   └── workflows/
-│       └── terraform-ci-cd.yml   # CI/CD pipeline definition
+│       └── terraform-ci-cd.yml   # CI/CD pipeline with OIDC auth
 ├── terraform/                    # All Terraform HCL code resides here
+│   ├── modules/
+│   │   ├── ecs-service/          # Reusable component for ECS deployments
+│   │   └── github-oidc-role/     # Reusable component for GitHub OIDC identity federation
 │   ├── main.tf                   # Provider setup & S3 backend + locking
 │   ├── variables.tf              # Input parameters (port, sizes, etc.)
 │   ├── vpc.tf                    # Networking layer (VPC, Subnets, Gateway)
@@ -113,13 +113,13 @@ aws dynamodb create-table \
   --region us-east-1
 ```
 
-### Step 3: Configure GitHub Credentials
-Add the following credentials to your repository on GitHub under **Settings** -> **Secrets and variables** -> **Actions**:
-* **Repository Secrets**:
-  * `AWS_ACCESS_KEY_ID`: Your AWS Access Key ID.
-  * `AWS_SECRET_ACCESS_KEY`: Your AWS Secret Access Key.
-* **Repository Variables**:
-  * `AWS_REGION`: `us-east-1` (or whichever region you deploy to).
+### Step 3: Configure GitHub Credentials (OIDC Keyless Auth)
+We use **OpenID Connect (OIDC)** for keyless authentication, which means you NEVER store long-lived AWS IAM access keys in GitHub Secrets.
+
+To set this up, run Terraform locally once to provision the OIDC Identity Provider and Roles using the `github-oidc-role` module.
+Once applied, simply add these variables to your GitHub Repository **Variables**:
+* `AWS_REGION`: `us-east-1` (or whichever region you deploy to).
+* `AWS_ROLE_TO_ASSUME`: The ARN of the generated GitHub Actions IAM role.
 
 ### Step 4: Trigger the Staging Pipeline
 To provision the staging environment:
