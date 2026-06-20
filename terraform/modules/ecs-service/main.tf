@@ -110,10 +110,9 @@ resource "aws_ecs_task_definition" "app" {
   ])
 
   # Ignore container image changes during updates (CI/CD handles it)
-  # Temporarily disabled to allow secret updates
-  # lifecycle {
-  #   ignore_changes = [container_definitions]
-  # }
+  lifecycle {
+    ignore_changes = [container_definitions]
+  }
 }
 
 # 6. ECS Service
