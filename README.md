@@ -11,55 +11,66 @@ The diagram below details the end-to-end GitOps flow, showing how commits trigge
 ```mermaid
 graph TD
     %% Repositories
-    subgraph Repositories["Version Control"]
+    subgraph Repositories [Version Control]
         IAC_Repo[Repo: infra-pilot-iac]
         App_Repo[Repo: infra-pilot-api]
     end
 
     %% Pipelines
-    subgraph IAC_Pipeline["Terraform CI/CD (GitHub Actions)"]
-        A1[git push / manual] --> OIDC1[OIDC Keyless Auth]
-        OIDC1 --> A2[Terraform Init & Validate]
-        A2 -->|Loads state key dynamically| S3_State[(AWS S3 State Bucket)]
-        A2 --> A3[Terraform Plan]
-        A3 -->|On main/stage branch| A4[Terraform Apply Baseline]
+    subgraph IAC_Pipeline [Terraform CI/CD]
+        A1[git push / manual]
+        OIDC1[OIDC Keyless Auth]
+        A2[Terraform Init & Validate]
+        S3_State[(AWS S3 State Bucket)]
+        A3[Terraform Plan]
+        A4[Terraform Apply Baseline]
     end
 
-    subgraph App_Pipeline["App CI/CD (GitHub Actions)"]
-        B1[git push / manual] --> OIDC2[OIDC Keyless Auth]
-        OIDC2 --> B2[Maven Package jar]
-        B2 --> B3[Docker Multi-stage Build]
-        B3 -->|Push with tags| ECR_Repo["AWS ECR Registry"]
-        ECR_Repo --> B4[Mutate ECS Task Definition (jq)]
-        B4 --> B5[Trigger ECS Rolling Deploy]
+    subgraph App_Pipeline [App CI/CD]
+        B1[git push / manual]
+        OIDC2[OIDC Keyless Auth]
+        B2[Maven Package jar]
+        B3[Docker Multi-stage Build]
+        ECR_Repo["AWS ECR Registry"]
+        B4[Mutate ECS Task Definition]
+        B5[Trigger ECS Rolling Deploy]
     end
-
-    IAC_Repo -->|Trigger| IAC_Pipeline
-    App_Repo -->|Trigger| App_Pipeline
 
     %% AWS Cloud Resources
-    subgraph AWS_Cloud["AWS Region (us-east-1)"]
-        subgraph VPC["VPC (10.50.0.0/16)"]
+    subgraph AWS_Cloud [AWS Region us-east-1]
+        CloudWatch["CloudWatch Log Groups"]
+        subgraph VPC [VPC 10.50.0.0/16]
             IGW[Internet Gateway]
-            
-            subgraph Public_Subnets["Public Subnets (AZ-A & AZ-B)"]
-                ALB["Application Load Balancer (:80 / :443)"]
-                
-                subgraph ECS_Fargate["ECS Fargate Tasks (awsvpc network)"]
-                    App_Container["Spring Boot Container (:8080)"]
+            subgraph Public_Subnets [Public Subnets AZ-A & AZ-B]
+                ALB["Application Load Balancer :80 / :443"]
+                subgraph ECS_Fargate [ECS Fargate Tasks]
+                    App_Container["Spring Boot Container :8080"]
                 end
             end
         end
-        
-        CloudWatch["CloudWatch Log Groups"]
     end
 
+    A1 --> OIDC1
+    OIDC1 --> A2
+    A2 -->|Loads state key dynamically| S3_State
+    A2 --> A3
+    A3 -->|On main/stage branch| A4
+
+    B1 --> OIDC2
+    OIDC2 --> B2
+    B2 --> B3
+    B3 -->|Push with tags| ECR_Repo
+    ECR_Repo --> B4
+    B4 --> B5
+
+    IAC_Repo -->|Trigger| A1
+    App_Repo -->|Trigger| B1
+
     %% Routing & Local networking
-    A4 -->|Provisions Base| AWS_Cloud
-    B5 -->|Overrides CPU/Memory & Updates Image| ECS_Fargate
+    A4 -->|Provisions Base| ALB
+    B5 -->|Overrides CPU/Memory & Updates Image| App_Container
     
-    ALB -->|Target Group Routing :8080| App_Container
-    
+    ALB -->|Target Group Routing| App_Container
     App_Container -.->|Writes Logs| CloudWatch
 ```
 
