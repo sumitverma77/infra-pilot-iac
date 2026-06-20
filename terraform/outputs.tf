@@ -25,15 +25,15 @@ output "ecs_service_name" {
 
 output "infra_deploy_role_arn" {
   description = "ARN of the Infrastructure Deployment Role"
-  value       = module.infra_deploy_role.role_arn
+  value       = var.environment == "stage" ? module.infra_deploy_role[0].role_arn : "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/infra-deploy-role"
 }
 
 output "app_deploy_stage_role_arn" {
   description = "ARN of the Application Stage Deployment Role"
-  value       = module.app_deploy_stage_role.role_arn
+  value       = var.environment == "stage" ? module.app_deploy_stage_role[0].role_arn : "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/app-deploy-stage-role"
 }
 
 output "app_deploy_prod_role_arn" {
   description = "ARN of the Application Prod Deployment Role"
-  value       = module.app_deploy_prod_role.role_arn
+  value       = var.environment == "stage" ? module.app_deploy_prod_role[0].role_arn : "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/app-deploy-prod-role"
 }
