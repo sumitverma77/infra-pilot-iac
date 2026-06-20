@@ -84,8 +84,15 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_secrets" {
 
 # --- GitHub OIDC Configuration ---
 
+# Global IAM Resources (Only provisioned in the 'stage' environment to prevent EntityAlreadyExists conflicts across the AWS account)
+locals {
+  create_global_iam = var.environment == "stage"
+  oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
+}
+
 # Global OIDC Provider for GitHub Actions
 resource "aws_iam_openid_connect_provider" "github" {
+  count           = local.create_global_iam ? 1 : 0
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1", "1c58a3a8518e8759bf075b76b750d4f2df264fcd"]
@@ -94,8 +101,9 @@ resource "aws_iam_openid_connect_provider" "github" {
 # 1. Infra Deploy Role (Allowed to deploy infra changes from main and stage branches)
 module "infra_deploy_role" {
   source            = "./modules/github-oidc-role"
+  count             = local.create_global_iam ? 1 : 0
   role_name         = "infra-deploy-role"
-  oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
+  oidc_provider_arn = local.oidc_provider_arn
   github_org        = "sumitverma77"
   match_subjects = [
     "repo:sumitverma77/infra-pilot-iac:ref:refs/heads/main",
@@ -107,8 +115,9 @@ module "infra_deploy_role" {
 # 2. App Deploy Role - Stage (Allowed to deploy to stage environment)
 module "app_deploy_stage_role" {
   source            = "./modules/github-oidc-role"
+  count             = local.create_global_iam ? 1 : 0
   role_name         = "app-deploy-stage-role"
-  oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
+  oidc_provider_arn = local.oidc_provider_arn
   github_org        = "sumitverma77"
   match_subjects = [
     "repo:sumitverma77/infra-pilot-api:environment:stage",
@@ -125,8 +134,9 @@ module "app_deploy_stage_role" {
 # 3. App Deploy Role - Prod (Allowed to deploy to prod environment)
 module "app_deploy_prod_role" {
   source            = "./modules/github-oidc-role"
+  count             = local.create_global_iam ? 1 : 0
   role_name         = "app-deploy-prod-role"
-  oidc_provider_arn = aws_iam_openid_connect_provider.github.arn
+  oidc_provider_arn = local.oidc_provider_arn
   github_org        = "sumitverma77"
   match_subjects = [
     "repo:sumitverma77/infra-pilot-api:environment:prod",
